@@ -4,9 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Heizungs-Beratung – In 3 Minuten zum passenden Angebot</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#F7F5EF;
@@ -23,8 +20,8 @@
     --radius:16px;
     --shadow:0 2px 10px rgba(20,30,25,.05);
     --shadow-hover:0 10px 26px rgba(27,58,75,.16);
-    --font-display:'Baloo 2','Poppins',sans-serif;
-    --font-body:'Inter',system-ui,-apple-system,sans-serif;
+    --font-display:system-ui,-apple-system,'Segoe UI',sans-serif;
+    --font-body:system-ui,-apple-system,'Segoe UI',sans-serif;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;}
@@ -150,6 +147,7 @@
 
 <main class="wizard" id="wizard"></main>
 
+<footer style="text-align:center;padding:20px 20px 32px;font-size:.9rem"><a href="datenschutz.html">Datenschutz</a> · <a href="impressum.html">Impressum</a></footer>
 <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
 
 <script>
@@ -178,6 +176,10 @@
    per zweitem fetch() gegen dieses Backend statt gegen
    state._demoCode.
 --------------------------------------------------------- */
+
+const CONSENT_VERSION = '2026-09-11.1';
+const PRIVACY_VERSION = '2026-09-11.1';
+const CONSENT_TEXT = "Ich willige ein, dass Techdeals, Inhaber Hamza Cal, meine Kontakt- und Projektangaben zur Bearbeitung meiner Heizungsanfrage verarbeitet und an maximal drei passende Fachbetriebe weitergibt. Techdeals und diese Fachbetriebe dürfen mich ausschließlich zu dieser Anfrage telefonisch und per E-Mail kontaktieren. Ich kann die Einwilligung jederzeit mit Wirkung für die Zukunft per E-Mail an hcal.business@outlook.de widerrufen. Ohne diese Einwilligung ist eine Vermittlung über dieses Formular nicht möglich.";
 
 const PRIMARY = "var(--primary)"; // Navy - Hauptfarbe der Icon-Silhouetten
 const ACCENT  = "var(--accent)";  // Messing - Akzentflächen
@@ -396,7 +398,14 @@ function render(){
         <div class="form-row" style="grid-template-columns:1fr;">
           <input class="form-input" id="email" type="email" placeholder="E-Mail*" value="${a.email||''}">
         </div>
-        <div class="consent">Mit Klick auf den untenstehenden Button lege ich mein Kundenkonto an, akzeptiere die <a href="#">AGB</a> und bestätige, die <a href="#">Datenschutzerklärung</a> zur Kenntnis genommen zu haben. Wir können Ihnen Informationen über ähnliche Produkte und Leistungen per E-Mail zusenden. Ein kostenloser Widerspruch ist jederzeit <a href="#">hier</a> möglich.</div>
+        <div class="consent">
+          <label style="display:flex;gap:10px;align-items:flex-start">
+            <input id="vermittlungConsent" type="checkbox" required aria-describedby="consentError" style="margin-top:4px;flex-shrink:0">
+            <span>${CONSENT_TEXT}</span>
+          </label>
+          <p>Weitere Informationen in der <a href="datenschutz.html" target="_blank" rel="noopener">Datenschutzerklärung</a>.</p>
+          <div id="consentError" class="field-error" role="alert" hidden>Bitte willigen Sie in die Vermittlung ein, um fortzufahren.</div>
+        </div>
         <button class="primary-btn" id="formNext">Weiter</button>
       </div>`;
   } else if(step.type==='phone'){
@@ -459,6 +468,10 @@ function render(){
   }
 
   if(step.type==='form'){
+    delete state.answers.einwilligung;
+    document.getElementById('vermittlungConsent').addEventListener('change', (event)=>{
+      document.getElementById('consentError').hidden = event.target.checked;
+    });
     let gender = (state.answers.kontakt && state.answers.kontakt.anrede) || 'Herr';
     wizardEl.querySelectorAll('.gender-pill').forEach(pill=>{
       pill.addEventListener('click', ()=>{
@@ -476,7 +489,18 @@ function render(){
         const el = document.getElementById(id);
         if(!val){ el.style.borderColor='#c0392b'; ok=false; } else { el.style.borderColor=''; }
       });
+      const consentInput = document.getElementById('vermittlungConsent');
+      document.getElementById('consentError').hidden = consentInput.checked;
+      if(!consentInput.checked){ consentInput.focus(); ok = false; }
       if(!ok) return;
+      state.answers.einwilligung = {
+        erteilt: true,
+        zeitpunkt: new Date().toISOString(),
+        version: CONSENT_VERSION,
+        datenschutzVersion: PRIVACY_VERSION,
+        text: CONSENT_TEXT,
+        maxFachbetriebe: 3
+      };
       state.answers.kontakt = { anrede:gender, vorname, nachname, email };
       advance();
     });
@@ -579,6 +603,7 @@ function render(){
 }
 
 function submitLead(answers){
+  if(!answers.einwilligung || answers.einwilligung.erteilt !== true){ return; }
   fetch('https://hook.eu2.make.com/1ryatii2bhsfoqprbb20nrr3n7b6furg', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
